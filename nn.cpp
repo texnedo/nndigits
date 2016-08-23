@@ -45,10 +45,17 @@ void NN::train(std::vector<Mat>& input,
             epochCount == 0 ||
             epochCount == 0 ||
             !validate(input.at(0))) {
+#if EXTENDED_TRACE
+        cout << "ILLEGAL ARGUMENTS PROVIDED" << endl;
+#endif
         return;
     }
     std::vector<int> indexes(input.size());
+    for (int i = 0; i < input.size(); ++i) {
+        indexes[i] = i;
+    }
     for (int i = 0; i < epochCount; ++i) {
+        //TODO - optimize this, just pick epochItemCount random elements
         random_shuffle(indexes.begin(), indexes.end());
         std::vector<int> epochIndexes(indexes.begin(), indexes.begin() + epochItemCount);
         trainInternal(input, desiredOutput, epochIndexes, learningRate);
@@ -258,22 +265,47 @@ int NN::evaluate(std::vector<Mat>& input, std::vector<Mat>& desiredOutput) {
     cout << "EVALUATE: " << input.size() << " SAMPLES" << endl;
 #endif
     assert(input.size() == desiredOutput.size());
+    //iterate through the provided training data and compute similarity between a network output and
+    //a desired value
+    int count = 0;
     for (int i = 0; i < input.size(); ++i) {
         Mat computedOutput = feedfoward(input[i]);
         assert(computedOutput.cols == 1);
         assert(computedOutput.rows == layers.back());
         assert(computedOutput.cols == desiredOutput[i].cols);
         assert(computedOutput.rows == desiredOutput[i].rows);
-        double maxComputedOutput = computedOutput.at(0, 0);
-        double maxComputedIndex = 0;
+        //find the biggest output value index
+        double maxComputedOutput = computedOutput.at<double>(0, 0);
+        int maxComputedIndex = 0;
         for (int j = 1; j < computedOutput.rows; ++j) {
-            if (computedOutput.at(0, i) > maxComputedOutput) {
-                maxComputedOutput = computedOutput.at(0, i);
+            if (computedOutput.at<double>(0, i) > maxComputedOutput) {
+                maxComputedOutput = computedOutput.at<double>(0, i);
                 maxComputedIndex = i;
             }
         }
+#if EXTENDED_TRACE
+        cout << "MAX COMPUTED VALUE: " << maxComputedOutput << " AT INDEX: " << maxComputedIndex << endl;
+#endif
+        //find the biggest output value index in a provided labels data
+        double maxDesiredOutput = desiredOutput[i].at<double>(0, 0);
+        int maxDesiredIndex = 0;
+        for (int j = 1; j < desiredOutput[i].rows; ++j) {
+            if (desiredOutput[i].at<double>(0, i) > maxDesiredOutput) {
+                maxDesiredOutput = desiredOutput[i].at<double>(0, i);
+                maxDesiredIndex = i;
+            }
+        }
+#if EXTENDED_TRACE
+        cout << "MAX DESIRED VALUE: " << maxDesiredOutput << " AT INDEX: " << maxDesiredIndex << endl;
+#endif
+        if (maxComputedIndex == maxDesiredIndex) {
+            count++;
+        }
     }
-
+#if EXTENDED_TRACE
+    cout << "EQUAL INDEX COUNT: " << count << endl;
+#endif
+    return count;
 }
 
 bool NN::validate(Mat &data) {
