@@ -6,17 +6,27 @@
 using namespace cv;
 using namespace std;
 
-#define EXTENDED_TRACE 1
+typedef vector<Mat> MAT_VEC;
 
-NN::NN(std::vector<int>& config) :
+#define EXTENDED_TRACE 0
+#define TRACE 1
+#define RAND_CONFIG 1
+
+NN::NN(vector<int>& config) :
     layers(config) {
     weights.reserve(config.size() - 1);
     biases.reserve(config.size() - 1);
+    setRNGSeed(unsigned(time(0)));
     for(int i = 1; i < config.size(); ++i) {
         Mat weight(config.at(i), config.at(i - 1), CV_64F);
-        randn(weight, 0, 1);
         Mat bias(config.at(i), 1, CV_64F);
+#if RAND_CONFIG
+        randn(weight, 0, 1);
         randn(bias, 0, 1);
+#else
+        weight.setTo(Scalar(0.1));
+        bias.setTo(Scalar(0.1));
+#endif
         weights.push_back(weight);
         biases.push_back(bias);
     }
@@ -35,8 +45,12 @@ void NN::traceConfig() {
     utils::trace(biases);
 }
 
-void NN::train(std::vector<Mat>& input,
-               std::vector<Mat>& desiredOutput,
+int myrandom (int i) {
+    return rand() % i;
+}
+
+void NN::train(MAT_VEC& input,
+               MAT_VEC& desiredOutput,
                int epochItemCount,
                int epochCount,
                double learningRate) {
@@ -50,27 +64,35 @@ void NN::train(std::vector<Mat>& input,
 #endif
         return;
     }
-    std::vector<int> indexes(input.size());
+    srand(unsigned(time(0)));
+    vector<int> indexes(input.size());
     for (int i = 0; i < input.size(); ++i) {
         indexes[i] = i;
     }
     for (int i = 0; i < epochCount; ++i) {
+#if TRACE
+        cout << "RUN TRAINING EPOCH " << i << " START" << endl;
+#endif
         //TODO - optimize this, just pick epochItemCount random elements
-        random_shuffle(indexes.begin(), indexes.end());
-        std::vector<int> epochIndexes(indexes.begin(), indexes.begin() + epochItemCount);
+        random_shuffle(indexes.begin(), indexes.end(), myrandom);
+        vector<int> epochIndexes(indexes.begin(), indexes.begin() + epochItemCount);
+#if TRACE
+        cout << "RUN TRAINING EPOCH " << i << " END" <<  endl;
+        utils::trace<int>(epochIndexes);
+#endif
         trainInternal(input, desiredOutput, epochIndexes, learningRate);
     }
 }
 
-void NN::trainInternal(std::vector<Mat> &data,
-                       std::vector<Mat> &desiredOutput,
-                       std::vector<int> &indexes,
+void NN::trainInternal(MAT_VEC &data,
+                       MAT_VEC &desiredOutput,
+                       vector<int> &indexes,
                        double learningRate) {
 #if EXTENDED_TRACE
     cout << "RUN TRAINING WITH " << indexes.size() << " SAMPLES:" << endl;
 #endif
-    std::vector<Mat> sumWeightDerivative;
-    std::vector<Mat> sumBiasDerivative;
+    MAT_VEC sumWeightDerivative;
+    MAT_VEC sumBiasDerivative;
     //init temporary storage to accamulate sum of each layer weights changes across all provided
     //to this method call samples
     for (int i = 0; i < weights.size(); i++) {
@@ -79,17 +101,24 @@ void NN::trainInternal(std::vector<Mat> &data,
     }
     for (int i = 0; i < indexes.size(); ++i) {
         int index = indexes[i];
-        Mat input = data[i];
-        Mat output = desiredOutput[i];
-        std::vector<Mat> weightDerivative;
-        std::vector<Mat> biasDerivative;
+        Mat input = data[index];
+        Mat output = desiredOutput[index];
+        MAT_VEC weightDerivative;
+        MAT_VEC biasDerivative;
         //backpropagate each input and output to calculate weights and biases change for this
         //particular sample
         backpropagate(input, output, weightDerivative, biasDerivative);
-        for (int i = 0; i < weights.size(); i++) {
-            sumWeightDerivative[i] += weightDerivative[i];
-            sumBiasDerivative[i] += biasDerivative[i];
+        for (int j = 0; j < weights.size(); j++) {
+            sumWeightDerivative[j] += weightDerivative[j];
+            sumBiasDerivative[j] += biasDerivative[j];
         }
+
+#if EXTENDED_TRACE
+        cout << "   WEIGHTS ON SAMPLE: " << i << endl;
+        utils::trace(weightDerivative);
+        cout << "   BIASES ON SAMPLE: " << i << endl;
+        utils::trace(biasDerivative);
+#endif
     }
 
 #if EXTENDED_TRACE
@@ -97,6 +126,8 @@ void NN::trainInternal(std::vector<Mat> &data,
     utils::trace(weights);
     cout << "   BIASES BEFORE UPDATE:" << endl;
     utils::trace(biases);
+
+    cout << "   WEIGHTS DELTA:" << endl;
 #endif
 
     //compute average weights and biases changes
@@ -110,6 +141,10 @@ void NN::trainInternal(std::vector<Mat> &data,
     }
 
 #if EXTENDED_TRACE
+    utils::trace(sumWeightDerivative);
+    cout << "   BIASES DELTA:" << endl;
+    utils::trace(sumBiasDerivative);
+
     cout << "   WEIGHTS AFTER UPDATE:" << endl;
     utils::trace(weights);
     cout << "   BIASES AFTER UPDATE:" << endl;
@@ -119,8 +154,8 @@ void NN::trainInternal(std::vector<Mat> &data,
 
 void NN::backpropagate(Mat &input,
                        Mat &desiredOutput,
-                       std::vector<Mat> &weightDerivative,
-                       std::vector<Mat> &biasDerivative) {
+                       MAT_VEC &weightDerivative,
+                       MAT_VEC &biasDerivative) {
 #if EXTENDED_TRACE
     cout << "BACKPROPAGATE:" << endl
          << "INPUT:" << input << endl
@@ -137,10 +172,10 @@ void NN::backpropagate(Mat &input,
 
     //feedforward input example and save activations on each layer
     //save each layer activations after applying sigmoid activation function
-    std::vector<Mat> activations;
+    MAT_VEC activations;
     activations.reserve(layers.size());
     //save each layer results before applying sigmoid activation function
-    std::vector<Mat> results;
+    MAT_VEC results;
     results.reserve(layers.size() - 1);
     activations.push_back(input);
 
@@ -242,7 +277,7 @@ void NN::backpropagate(Mat &input,
     }
 }
 
-int NN::evaluate(std::vector<Mat>& input, std::vector<Mat>& desiredOutput) {
+int NN::evaluate(MAT_VEC& input, MAT_VEC& desiredOutput) {
 //    Mat initial = feedfoward(input.at(0));
 //    cout << "INITIAL RESULT:" <<  endl << initial << endl;
 //    cout << "UPDATE:" << endl;
@@ -268,6 +303,7 @@ int NN::evaluate(std::vector<Mat>& input, std::vector<Mat>& desiredOutput) {
     //iterate through the provided training data and compute similarity between a network output and
     //a desired value
     int count = 0;
+    int rndCount = 0;
     for (int i = 0; i < input.size(); ++i) {
         Mat computedOutput = feedfoward(input[i]);
         assert(computedOutput.cols == 1);
@@ -278,9 +314,9 @@ int NN::evaluate(std::vector<Mat>& input, std::vector<Mat>& desiredOutput) {
         double maxComputedOutput = computedOutput.at<double>(0, 0);
         int maxComputedIndex = 0;
         for (int j = 1; j < computedOutput.rows; ++j) {
-            if (computedOutput.at<double>(0, i) > maxComputedOutput) {
-                maxComputedOutput = computedOutput.at<double>(0, i);
-                maxComputedIndex = i;
+            if (computedOutput.at<double>(0, j) > maxComputedOutput) {
+                maxComputedOutput = computedOutput.at<double>(0, j);
+                maxComputedIndex = j;
             }
         }
 #if EXTENDED_TRACE
@@ -290,9 +326,9 @@ int NN::evaluate(std::vector<Mat>& input, std::vector<Mat>& desiredOutput) {
         double maxDesiredOutput = desiredOutput[i].at<double>(0, 0);
         int maxDesiredIndex = 0;
         for (int j = 1; j < desiredOutput[i].rows; ++j) {
-            if (desiredOutput[i].at<double>(0, i) > maxDesiredOutput) {
-                maxDesiredOutput = desiredOutput[i].at<double>(0, i);
-                maxDesiredIndex = i;
+            if (desiredOutput[i].at<double>(0, j) > maxDesiredOutput) {
+                maxDesiredOutput = desiredOutput[i].at<double>(0, j);
+                maxDesiredIndex = j;
             }
         }
 #if EXTENDED_TRACE
@@ -301,9 +337,16 @@ int NN::evaluate(std::vector<Mat>& input, std::vector<Mat>& desiredOutput) {
         if (maxComputedIndex == maxDesiredIndex) {
             count++;
         }
-    }
+        if ((rand() % 9) == maxDesiredIndex) {
+            rndCount++;
+        }
 #if EXTENDED_TRACE
+        cout << "DESIRED: " << desiredOutput[i] << endl << " COMPUTED: " << computedOutput << endl;
+#endif
+    }
+#if TRACE
     cout << "EQUAL INDEX COUNT: " << count << endl;
+    cout << "RND EQUAL INDEX COUNT: " << rndCount << endl;
 #endif
     return count;
 }

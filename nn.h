@@ -30,6 +30,8 @@ private:
                         std::vector<int> &indexes,
                         double learningRate
                         );
+//TODO - remove this
+public:
      void backpropagate(cv::Mat& input,
                         cv::Mat& desiredOutput,
                         std::vector<cv::Mat>& weightDerivative,

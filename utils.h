@@ -34,7 +34,8 @@ namespace utils {
         return outputActivations - desiredOutput;
     }
 
-    inline void trace(const std::vector<cv::Mat>& data) {
+    template <class T>
+    inline void trace(const std::vector<T>& data) {
         for (int i = 0; i < data.size(); ++i) {
             std::cout << data.at(i) << std::endl;
         }
