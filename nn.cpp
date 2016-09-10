@@ -18,14 +18,15 @@ NN::NN(vector<int>& config) :
     biases.reserve(config.size() - 1);
     setRNGSeed(unsigned(time(0)));
     for(int i = 1; i < config.size(); ++i) {
+        srand(unsigned(time(0)));
         Mat weight(config.at(i), config.at(i - 1), CV_64F);
         Mat bias(config.at(i), 1, CV_64F);
 #if RAND_CONFIG
         randn(weight, 0, 1);
         randn(bias, 0, 1);
 #else
-        weight.setTo(Scalar(0.1));
-        bias.setTo(Scalar(0.1));
+        weight = Scalar(0.1);
+        bias = Scalar(0.1);
 #endif
         weights.push_back(weight);
         biases.push_back(bias);
@@ -40,13 +41,9 @@ void NN::traceConfig() {
         cout << layers.at(i) << " ";
     }
     cout << endl << "  Weights: " << "(" << weights.size() <<")" << endl;
-    utils::trace(weights);
+    utils::trace<Mat>(weights);
     cout << endl << "  biases: " << "(" << biases.size() << ")" << endl;
-    utils::trace(biases);
-}
-
-int myrandom (int i) {
-    return rand() % i;
+    utils::trace<Mat>(biases);
 }
 
 void NN::train(MAT_VEC& input,
@@ -64,21 +61,20 @@ void NN::train(MAT_VEC& input,
 #endif
         return;
     }
-    srand(unsigned(time(0)));
-    vector<int> indexes(input.size());
+    vector<int> indexes;
+    indexes.reserve(input.size());
     for (int i = 0; i < input.size(); ++i) {
-        indexes[i] = i;
+        indexes.push_back(i);
     }
     for (int i = 0; i < epochCount; ++i) {
 #if TRACE
         cout << "RUN TRAINING EPOCH " << i << " START" << endl;
 #endif
-        //TODO - optimize this, just pick epochItemCount random elements
-        random_shuffle(indexes.begin(), indexes.end(), myrandom);
-        vector<int> epochIndexes(indexes.begin(), indexes.begin() + epochItemCount);
+        vector<int> epochIndexes;
+        epochIndexes.reserve(epochItemCount);
+        utils::shuffleOptimal<int>(indexes, epochIndexes);
 #if TRACE
         cout << "RUN TRAINING EPOCH " << i << " END" <<  endl;
-        utils::trace<int>(epochIndexes);
 #endif
         trainInternal(input, desiredOutput, epochIndexes, learningRate);
     }
@@ -96,11 +92,19 @@ void NN::trainInternal(MAT_VEC &data,
     //init temporary storage to accamulate sum of each layer weights changes across all provided
     //to this method call samples
     for (int i = 0; i < weights.size(); i++) {
-        sumWeightDerivative.push_back(Mat::zeros(weights[i].rows, weights[i].cols, CV_64F));
-        sumBiasDerivative.push_back(Mat::zeros(biases[i].rows, biases[i].cols, CV_64F));
+        //init place to accamulate weight changes
+        Mat weigthDerivative(weights[i].rows, weights[i].cols, CV_64F);
+        weigthDerivative = Scalar(0);
+        sumWeightDerivative.push_back(weigthDerivative);
+        //init place to accamulate bias changes
+        Mat biasDerivative(biases[i].rows, biases[i].cols, CV_64F);
+        biasDerivative = Scalar(0);
+        sumBiasDerivative.push_back(biasDerivative);
     }
     for (int i = 0; i < indexes.size(); ++i) {
         int index = indexes[i];
+        assert(index < data.size());
+        assert(index < desiredOutput.size());
         Mat input = data[index];
         Mat output = desiredOutput[index];
         MAT_VEC weightDerivative;
@@ -268,8 +272,8 @@ void NN::backpropagate(Mat &input,
 #endif
 
         //compute current layer weights change
-        weightDerivative[i] = delta * prevActivation.t();
-
+        Mat copyPrevActivation = prevActivation.clone();
+        weightDerivative[i] = delta * copyPrevActivation.t();
 
 #if EXTENDED_TRACE
         cout << "____________________________________________"<< endl;

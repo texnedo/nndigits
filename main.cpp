@@ -127,8 +127,6 @@ void readMnistData(MAT_VEC& trainingImages,
                    MAT_VEC& validateLabels) {
     readImages("../train-images.idx3-ubyte", trainingImages);
     readLabels("../train-labels.idx1-ubyte", trainingLabels);
-    MAT_VEC tenkImages;
-    MAT_VEC tenkLabels;
     readImages("../t10k-images.idx3-ubyte", validateImages);
     readLabels("../t10k-labels.idx1-ubyte", validateLabels);
     assert(trainingImages.size() == trainingLabels.size());
@@ -262,11 +260,17 @@ int main(int argc, char *argv[]) {
     int outputSize = trainingLabels[0].rows;
     vector<int> config = { inputSize, 30, outputSize };
     NN net(config);
-    net.train(trainingImages, trainingLabels, 30, 1000, 1);
+    cout << trainingImages.size() << " " << trainingLabels.size() << endl;
+    net.train(trainingImages, trainingLabels, 1000, 20000, 5);
     cout << "result" << endl;
     Mat result = net.feedfoward(*(trainingImages.begin() + 0));
-    cout << result;
+    cout << result << endl;
+
     cout << "evaluate:" << endl;
     cout << net.evaluate(trainingImages, trainingLabels) << "/" << trainingLabels.size() << endl;
+
+    cout << "validate:" << endl;
+    cout << net.evaluate(validateImages, validateLabels) << "/" << validateLabels.size() << endl;
+
     return 0;
 }

@@ -6,7 +6,8 @@ INCLUDEPATH += /usr/local/include/
 LIBS += -L/usr/local/lib/ -lopencv_highgui -lopencv_core
 
 SOURCES += main.cpp \
-    nn.cpp
+    nn.cpp \
+    utils.cpp
 
 HEADERS += \
     nn.h \

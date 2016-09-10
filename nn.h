@@ -25,9 +25,9 @@ private:
      std::vector<cv::Mat> weights;
      std::vector<cv::Mat> biases;
      bool validate(cv::Mat& data);
-     void trainInternal(std::vector<cv::Mat> &data,
-                        std::vector<cv::Mat> &desiredOutput,
-                        std::vector<int> &indexes,
+     void trainInternal(std::vector<cv::Mat>& data,
+                        std::vector<cv::Mat>& desiredOutput,
+                        std::vector<int>& indexes,
                         double learningRate
                         );
 //TODO - remove this
