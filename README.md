@@ -4,9 +4,10 @@ Very simple Neural Network for hanwritten digits recognition from MNIST database
 
 # results
 
-evaluate:
+evaluate(test all training samples):
 EQUAL INDEX COUNT: 55108
-55108/60000
-validate:
+55108/60000 
+
+validate(test all validation samples):
 EQUAL INDEX COUNT: 9163
 9163/10000
