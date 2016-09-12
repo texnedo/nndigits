@@ -15,6 +15,7 @@ typedef vector<Mat> MAT_VEC;
 
 #define SHOW_EVERY_IMAGE 0
 #define SHOW_ALL_IMAGES 0
+#define SHOW_VALIDATE_IMAGES 0
 
 int readImages(const char* fileName, MAT_VEC& images) {
     ifstream trainingData(fileName, ios::in|ios::binary);
@@ -135,16 +136,20 @@ void readMnistData(MAT_VEC& trainingImages,
     assert(validateImages.size() > 1);
 }
 
+void showImage(Mat& imgae, Mat& label) {
+    Mat imgaeToShow = imgae.clone();
+    int size = sqrt(max(imgaeToShow.cols, imgaeToShow.rows));
+    imgaeToShow.cols = size;
+    imgaeToShow.rows = size;
+    namedWindow("image", WINDOW_AUTOSIZE);
+    imshow("image", imgaeToShow);
+    cout << "Expected label: "  << endl << label << endl;
+    waitKey(0);
+}
+
 void showMnistData(MAT_VEC& images, MAT_VEC& labels) {
     for (int i = 0; i < images.size(); ++i) {
-        Mat imgaeToShow = images[i].clone();
-        int size = sqrt(max(imgaeToShow.cols, imgaeToShow.rows));
-        imgaeToShow.cols = size;
-        imgaeToShow.rows = size;
-        namedWindow("test image", WINDOW_AUTOSIZE);
-        imshow("test image", imgaeToShow);
-        cout << labels[i] << endl;
-        waitKey(0);
+        showImage(images[i], labels[i]);
     }
 }
 
@@ -262,15 +267,20 @@ int main(int argc, char *argv[]) {
     NN net(config);
     cout << trainingImages.size() << " " << trainingLabels.size() << endl;
     net.train(trainingImages, trainingLabels, 1000, 20000, 5);
-    cout << "result" << endl;
-    Mat result = net.feedfoward(*(trainingImages.begin() + 0));
-    cout << result << endl;
 
     cout << "evaluate:" << endl;
     cout << net.evaluate(trainingImages, trainingLabels) << "/" << trainingLabels.size() << endl;
 
     cout << "validate:" << endl;
     cout << net.evaluate(validateImages, validateLabels) << "/" << validateLabels.size() << endl;
+
+#if SHOW_VALIDATE_IMAGES
+    for (int i = 0; i < validateImages.size(); ++i) {
+        showImage(validateImages[i], validateLabels[i]);
+        Mat result = net.feedfoward(validateImages[i]);
+        cout << "Computed: "  << endl << result << endl;
+    }
+#endif
 
     return 0;
 }
